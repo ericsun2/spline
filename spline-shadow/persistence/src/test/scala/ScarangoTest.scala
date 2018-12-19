@@ -30,6 +30,7 @@
  */
 
 
+import ArangoModel._
 import com.outr.arango._
 import com.outr.arango.managed._
 import org.scalatest.mockito.MockitoSugar
@@ -38,29 +39,35 @@ import org.scalatest.{FunSpec, Matchers}
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 
+object ArangoModel {
+  case class Progress(_id: Option[String], _key: Option[String], _rev: Option[String], timestamp: Long, readCount: Long) extends DocumentOption
+  case class Execution(_id: Option[String], _key: Option[String], _rev: Option[String], appId: String, appName: String, sparkVer: String, timestamp: Long) extends DocumentOption
+  case class Schema(schema: Seq[String], _id: Option[String], _key: Option[String], _rev: Option[String]) extends DocumentOption
+  case class Operation(_id: Option[String], _key: Option[String], _rev: Option[String], name: String, expression: String) extends DocumentOption
+  case class DataSource(_id: Option[String], _key: Option[String], _rev: Option[String], name: String, path: String) extends DocumentOption
+  case class ProgressOf(_id: Option[String], _key: Option[String], _rev: Option[String], _from: String, _to: String) extends Edge with DocumentOption
+}
+
 class ScarangoTest extends FunSpec with Matchers with MockitoSugar {
 
   describe("scarango") {
     it("funspec") {
-      case class Fruit(name: String,
-                 _key: Option[String] = None,
-                 _id: Option[String] = None,
-                 _rev: Option[String] = None) extends DocumentOption
-      case class Progress(_id: Option[String], _key: Option[String], _rev: Option[String], timestamp: Long, readCount: Long) extends DocumentOption
-      case class Execution(_id: Option[String], _key: Option[String], _rev: Option[String], appId: String, appName: String, sparkVer: String, timestamp: Long) extends DocumentOption
-      case class Operation(_id: Option[String], _key: Option[String], _rev: Option[String], name: String, expression: String)
-      case class DataSource(_id: Option[String], _key: Option[String], _rev: Option[String], name: String, path: String)
       object Database extends Graph("lineages") {
         val progress: VertexCollection[Progress] = vertex[Progress]("progress")
         val execution: VertexCollection[Execution] = vertex[Execution]("execution")
+        val schema: VertexCollection[Schema] = vertex[Schema]("schema")
         val operation: VertexCollection[Operation] = vertex[Operation]("operation")
         val dataSource: VertexCollection[DataSource] = vertex[DataSource]("dataSource")
+        val progressOf: EdgeCollection[ProgressOf] = edge[ProgressOf]("progressOf", ("progress", "execution"))
       }
       val result = Await.result(Database.init(), Duration.Inf)
       println("Init result: " + result)
 //      print("Graph creation result: " + Await.result(Database.fruit.create(), Duration.Inf))
 //      println(Await.result(Database.fruit.insert(Fruit("Apple")), Duration.Inf))
-      val query = aql"FOR f IN fruit RETURN f"
+      val execution: Execution = Await.result(Database.execution.insert(Execution(None, None, None, "appId1", "appName1", "2.2", System.currentTimeMillis)), Duration.Inf)
+      val progress: Progress = Await.result(Database.progress.insert(Progress(None, None, None, System.currentTimeMillis, 10)), Duration.Inf)
+      val progressOf = Await.result(Database.progressOf.insert(ProgressOf(None, None, None, progress._id.get, execution._id.get)), Duration.Inf)
+      val query = aql"FOR f IN progress RETURN f"
 //      println(Await.result(Database.fruit.cursor(query), Duration.Inf))
     }
   }
