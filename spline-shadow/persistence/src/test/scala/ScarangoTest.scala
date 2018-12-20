@@ -102,8 +102,8 @@ class ScarangoTest extends FunSpec with Matchers with MockitoSugar {
   }
 
   def save(dataLineage: DataLineage): Unit = {
-    val execution = Execution(dataLineage.appId, dataLineage.appName, dataLineage.sparkVer, dataLineage.timestamp, Some(dataLineage.id.toString))
-    Database.execution.upsert(execution)
+//    val execution = Execution(dataLineage.appId, dataLineage.appName, dataLineage.sparkVer, dataLineage.timestamp, Some(dataLineage.id.toString))
+//    Database.execution.upsert(execution)
 
     val operations = dataLineage.operations.map(op => {
       val outputSchema = findOutputSchema(dataLineage, op)
