@@ -83,7 +83,7 @@ class ScarangoTest extends FunSpec with Matchers with MockitoSugar {
 //      val execution: Execution = Await.result(Database.execution.insert(Execution("appId1", "appName1", "2.2", System.currentTimeMillis)), Duration.Inf)
 //      val progress: Progress = Await.result(Database.progress.insert(Progress(System.currentTimeMillis, 10)), Duration.Inf)
 //      val progressOf = Await.result(Database.progressOf.insert(ProgressOf(progress._id.get, execution._id.get)), Duration.Inf)
-      val query = aql"FOR f IN progress RETURN f"
+//      val query = aql"FOR f IN progress RETURN f"
       save(datalineage())
     }
 
@@ -102,8 +102,6 @@ class ScarangoTest extends FunSpec with Matchers with MockitoSugar {
   }
 
   def save(dataLineage: DataLineage): Unit = {
-//    val execution = Execution(dataLineage.appId, dataLineage.appName, dataLineage.sparkVer, dataLineage.timestamp, Some(dataLineage.id.toString))
-//    Database.execution.upsert(execution)
 
     val operations = dataLineage.operations.map(op => {
       val outputSchema = findOutputSchema(dataLineage, op)
@@ -123,16 +121,18 @@ class ScarangoTest extends FunSpec with Matchers with MockitoSugar {
 //    })
 //    dataSources.foreach(Database.dataSource.insert(_))
 //
+    val execution = Execution(dataLineage.appId, dataLineage.appName, dataLineage.sparkVer, dataLineage.timestamp, Some(dataLineage.id.toString))
+    Database.execution.upsert(execution)
 //    // progress for batch need to be generated during migration
-//    val progress = dataLineage.operations.find(_.isInstanceOf[BatchWrite]).map(_ => Progress(dataLineage.timestamp, -1, Some(dataLineage.rootDataset.id.toString)))
-//    progress.foreach(Database.progress.insert(_))
-//
-//    val progressOf = progress.map(p => ProgressOf(execution._key.get, p._key.get, p._key))
-//    progressOf.foreach(Database.progressOf.insert(_))
+    val progress = dataLineage.operations.find(_.isInstanceOf[BatchWrite]).map(_ => Progress(dataLineage.timestamp, -1, Some(dataLineage.rootDataset.id.toString)))
+    progress.foreach(Database.progress.insert(_))
+
+    val progressOf = progress.map(p => ProgressOf("progress/" + p._key.get, "execution/" +  execution._key.get, p._key))
+    progressOf.foreach(Database.progressOf.insert(_))
 //
 //    // TODO implements
-//    val implements = Implements(execution._key.get, dataLineage.rootOperation.mainProps.output.toString)
-//    Await.result(Database.implements.insert(implements), Duration.Inf)
+    val implements = Implements("execution/" + execution._key.get, "operation/" + dataLineage.rootOperation.mainProps.output.toString, execution._key)
+    Await.result(Database.implements.insert(implements), Duration.Inf)
 
     // TODO writesTo, readsFrom:
     // TODO Lineages are connected via meta dataset ids, should we store that somehow in progress events as well?
@@ -161,6 +161,7 @@ class ScarangoTest extends FunSpec with Matchers with MockitoSugar {
       val md2 = MetaDataset(randomUUID, aSchema)
       val md3 = MetaDataset(randomUUID, bSchema)
       val md4 = MetaDataset(randomUUID, bSchema)
+      val mdOutput = MetaDataset(randomUUID, bSchema)
 
       DataLineage(
         appId,
@@ -168,13 +169,13 @@ class ScarangoTest extends FunSpec with Matchers with MockitoSugar {
         timestamp,
         "2.3.0",
         Seq(
-          BatchWrite(OperationProps(randomUUID, "Write", Seq(md1.id), md1.id), "parquet", path, append),
-          Generic(OperationProps(randomUUID, "Union", Seq(md1.id, md2.id), md3.id), "rawString1"),
+          BatchWrite(OperationProps(randomUUID, "Write", Seq(md3.id), mdOutput.id), "parquet", path, append),
           Generic(OperationProps(randomUUID, "Filter", Seq(md4.id), md2.id), "rawString2"),
           Generic(OperationProps(randomUUID, "LogicalRDD", Seq.empty, md4.id), "rawString3"),
-          Generic(OperationProps(randomUUID, "Filter", Seq(md4.id), md1.id), "rawString4")
+          Generic(OperationProps(randomUUID, "Filter", Seq(md4.id), md1.id), "rawString4"),
+          Generic(OperationProps(randomUUID, "Union", Seq(md1.id, md2.id), md3.id), "rawString1")
         ),
-        Seq(md1, md2, md3, md4),
+        Seq(mdOutput, md1, md2, md3, md4),
         attributes,
         dataTypes
       )
